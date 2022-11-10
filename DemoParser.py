@@ -5,6 +5,7 @@ from Snapshot import Q3_Snapshot
 from PlayerState import Q3_PlayerState
 from EntityState import Q3_EntityState
 from ParserState import Q3_ParserState
+from struct import unpack,pack
 
 class Q3_DemoParser:
 	# some parts converted from source code of quake3 (id software)
@@ -35,9 +36,9 @@ class Q3_DemoParser:
 		self.packetLoop = []
 		self.gameStates = []
 		self.ErrorString = None
-
+		self.c = 0
 		self.snap = Q3_Snapshot()
-
+		self.estates = []
 		self.entityBaselines = []
 		for i in range(1024):
 			self.entityBaselines.append(Q3_EntityState())
@@ -59,6 +60,9 @@ class Q3_DemoParser:
 		self.state = Q3_DemoParser.Q3_DEMOPARSER_STATE_PARSING
 
 	def nextFrame(self):
+		self.c +=1
+		self.estates.append([])
+		print('parser interation: '+str(self.c))
 		if(not self.packetLoop):
 			self.packetLoop = self.readDemoMessage()
 
@@ -80,16 +84,11 @@ class Q3_DemoParser:
 
 		msg = Q3_Message(Q3_Message.Q3_MAX_MSGLEN)
 		msg.CurSize = self.readIntegerFromStream()
-		if(msg.CurSize == False):
-			self.state = Q3_DemoParser.Q3_DEMOPARSER_STATE_FINISHED
-			return None
 
-		if(msg.CurSize == -1):
+		if(msg.CurSize > msg.MaxSize):
+			print("Read successfully finished")
 			self.state = Q3_DemoParser.Q3_DEMOPARSER_STATE_FINISHED
 			return None
-		if(msg.CurSize > msg.MaxSize):
-			print("readDemoMessage(): msglen > maxlen!!! (self.cycle)")
-			quit()
 
 		if(not (data:= self.fileHandler.read(msg.CurSize))):
 			print("readDemoMessage(): demo file was truncated! (self.cycle)")
@@ -185,9 +184,10 @@ class Q3_DemoParser:
 			oldSnap = None
 		else:
 			msg, oldSnap.Ps, newSnap.Ps = self.readDeltaPlayerstate( msg, oldSnap.Ps, newSnap.Ps )
-
+		
 		msg, oldSnap, newSnap = self.readPacketEntities(msg, oldSnap, newSnap)
-
+		#print(oldSnap.number)
+		#print(newSnap.number)
 		# if not valid, dump the entire thing now that it has
 		# been properly read
 		if(not newSnap.Valid):
@@ -264,12 +264,22 @@ class Q3_DemoParser:
 		if(msg.ReadBits(1) == 1):
 			to = Q3_EntityState()
 			to.number = Q3_DemoParser.Q3_DEMOPARSER_MAX_GENTITIES-1
+			self.estates[self.c-1].append(to)
+			print('________________')
+			print(to.number)
+			print(to.pos.trBase)
+			print('________________')
 			return msg,to,fr
 
 		# check for no delta
 		if(msg.ReadBits(1) == 0):
 			to = fr
 			to.number = number
+			self.estates[self.c-1].append(to)
+			print('________________')
+			print(to.number)
+			print(to.pos.trBase)
+			print('________________')
 			return msg,to,fr
 
 		lc = msg.ReadByte()
@@ -288,7 +298,7 @@ class Q3_DemoParser:
 							trunc -= (1<<(13-1))
 							exec("to."+Q3_EntityState.NetFields[i][0]+" = float(trunc)")
 						else:
-							exec("to."+Q3_EntityState.NetFields[i][0]+" = float(msg.ReadBits(32))") # full floating point value (QUAKE3)
+							exec("to."+Q3_EntityState.NetFields[i][0]+" = unpack('f',pack('I',msg.ReadBits(32)))[0]") # full floating point value (QUAKE3)
 			
 				else:
 					if(msg.ReadBits(1) == 0):
@@ -298,6 +308,11 @@ class Q3_DemoParser:
 
 		for i in range(lc,len(Q3_EntityState.NetFields)):
 			exec("to."+Q3_EntityState.NetFields[i][0]+" = fr."+Q3_EntityState.NetFields[i][0])
+		self.estates[self.c-1].append(to)
+		print('________________')
+		print(to.number)
+		print(to.pos.trBase)
+		print('________________')
 		return msg,fr,to
 
 	def readDeltaPlayerstate(self, msg, oldPs, newPs ):
@@ -315,6 +330,7 @@ class Q3_DemoParser:
 					if(msg.ReadBits(1) == 0):
 						# integral float
 						trunc = int(msg.ReadBits(13))
+
 						# bias to allow equal parts positive and negative
 						trunc -= (1<<(13-1))
 
@@ -323,7 +339,7 @@ class Q3_DemoParser:
 					else:
 						# full floating point value
 						# magic and dirty ;)
-						exec("newPs."+Q3_PlayerState.NetFields[i][0]+" = msg.ReadBits(32)")
+						exec("newPs."+Q3_PlayerState.NetFields[i][0]+" = unpack('f',pack('I',msg.ReadBits(32)))[0]")
 				else:
 					# magic and dirty ;)
 					exec("newPs."+Q3_PlayerState.NetFields[i][0]+" = int(msg.ReadBits("+str(Q3_PlayerState.NetFields[i][1])+"))")
@@ -412,7 +428,9 @@ class Q3_DemoParser:
 
 			if(oldnum > newnum):
 				# delta from baseline
+
 				msg, newSnap, self.entityBaselines[newnum] = self.deltaEntity(msg, newSnap, newnum, self.entityBaselines[newnum], False)
+				#print(self.entityBaselines[newnum].origin)
 				continue
 
 		# any remaining entities in the old frame are copied over

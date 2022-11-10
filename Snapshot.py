@@ -1,4 +1,5 @@
 from PlayerState import Q3_PlayerState
+from EntityState import Q3_EntityState
 
 class Q3_Snapshot:
 	def __init__(self):
