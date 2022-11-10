@@ -1,6 +1,25 @@
 from Trajectory import Q3_Trajectory
 
 class Q3_EntityState:
+	@staticmethod
+	def getEntityType(type):
+		return [
+			'ET_GENERAL',
+			'ET_PLAYER',
+			'ET_ITEM',
+			'ET_MISSILE',
+			'ET_MOVER',
+			'ET_BEAM',
+			'ET_PORTAL',
+			'ET_SPEAKER',
+			'ET_PUSH_TRIGGER',
+			'ET_TELEPORT_TRIGGER',
+			'ET_INVISIBLE',
+			'ET_GRAPPLE',
+			'ET_TEAM',
+			'ET_EVENTS'
+		][type+1]
+
 	def __init__(self):
 		self.pos = Q3_Trajectory() # for calculating position
 		self.apos = Q3_Trajectory() # for calculating angles

@@ -21,6 +21,9 @@ class Q3_DemoParser:
 
 	Q3_DEMOPARSER_MAX_GENTITIES = (1 << 10)
 
+	Q3_MAX_MSGLEN = 16384
+	Q3_BIG_INFO_STRING = 8192
+	MAX_STRING_CHARS = 1024
 	Q3_DEMOPARSER_SVC_NOP = 1
 	Q3_DEMOPARSER_SVC_GAMESTATE = 2
 	Q3_DEMOPARSER_SVC_CONFIGSTRING = 3
@@ -36,33 +39,19 @@ class Q3_DemoParser:
 		self.packetLoop = []
 		self.gameStates = []
 		self.ErrorString = None
-		self.c = 0
+
 		self.snap = Q3_Snapshot()
-		self.estates = []
-		self.entityBaselines = []
-		for i in range(1024):
-			self.entityBaselines.append(Q3_EntityState())
 
-		self.parseEntities = []
-		for i in range(2048):
-			self.parseEntities.append(Q3_EntityState())
-
-		self.snapshots = []
-		for i in range(32):
-			self.snapshots.append(Q3_Snapshot())
+		self.entityBaselines = [Q3_EntityState()]*1024
+		self.parseEntities = [Q3_EntityState()]*2048
+		self.snapshots = [Q3_Snapshot()]*32
 
 		self.fileHandler = open(filename, "rb")
-		#if(!file_exists(filename))
-		#	throwException("can't open demofile filename...");
-
 		self.currentGameState = Q3_GameState()
 
 		self.state = Q3_DemoParser.Q3_DEMOPARSER_STATE_PARSING
 
 	def nextFrame(self):
-		self.c +=1
-		self.estates.append([])
-		print('parser interation: '+str(self.c))
 		if(not self.packetLoop):
 			self.packetLoop = self.readDemoMessage()
 
@@ -82,7 +71,7 @@ class Q3_DemoParser:
 			self.state = Q3_DemoParser.Q3_DEMOPARSER_STATE_FINISHED
 			return None
 
-		msg = Q3_Message(Q3_Message.Q3_MAX_MSGLEN)
+		msg = Q3_Message(Q3_DemoParser.Q3_MAX_MSGLEN)
 		msg.CurSize = self.readIntegerFromStream()
 
 		if(msg.CurSize > msg.MaxSize):
@@ -217,7 +206,9 @@ class Q3_DemoParser:
 
 		while(True):
 			cmd = msg.ReadByte()
-
+			if ( cmd == -1):
+				print("Parse_GameState: read past end of demo message")
+				quit()
 			if(cmd == Q3_DemoParser.Q3_DEMOPARSER_SVC_EOF):
 				break
 
@@ -261,25 +252,16 @@ class Q3_DemoParser:
 			print("Bad delta entity number: number (self.cycle)")
 			quit()
 		# check for remove
+		
 		if(msg.ReadBits(1) == 1):
 			to = Q3_EntityState()
 			to.number = Q3_DemoParser.Q3_DEMOPARSER_MAX_GENTITIES-1
-			self.estates[self.c-1].append(to)
-			print('________________')
-			print(to.number)
-			print(to.pos.trBase)
-			print('________________')
 			return msg,to,fr
 
 		# check for no delta
 		if(msg.ReadBits(1) == 0):
 			to = fr
 			to.number = number
-			self.estates[self.c-1].append(to)
-			print('________________')
-			print(to.number)
-			print(to.pos.trBase)
-			print('________________')
 			return msg,to,fr
 
 		lc = msg.ReadByte()
@@ -288,8 +270,7 @@ class Q3_DemoParser:
 		for i in range(lc):
 			if(msg.ReadBits(1) == 0):
 				exec("to."+Q3_EntityState.NetFields[i][0]+" = fr."+Q3_EntityState.NetFields[i][0])
-			else:
-				if(Q3_EntityState.NetFields[i][1] == 0):
+			elif(Q3_EntityState.NetFields[i][1] == 0):
 					if(msg.ReadBits(1) == 1):
 						if(msg.ReadBits(1) == 0):
 							# integral float
@@ -300,19 +281,13 @@ class Q3_DemoParser:
 						else:
 							exec("to."+Q3_EntityState.NetFields[i][0]+" = unpack('f',pack('I',msg.ReadBits(32)))[0]") # full floating point value (QUAKE3)
 			
-				else:
-					if(msg.ReadBits(1) == 0):
-						exec("to."+Q3_EntityState.NetFields[i][0]+" = float(0)")
-					else:
-						exec("to."+Q3_EntityState.NetFields[i][0]+" = float(msg.ReadBits("+str(Q3_EntityState.NetFields[i][1])+"))") # full floating point value (QUAKE3)
+			elif(msg.ReadBits(1) == 0):
+				exec("to."+Q3_EntityState.NetFields[i][0]+" = float(0)")
+			else:
+				exec("to."+Q3_EntityState.NetFields[i][0]+" = float(msg.ReadBits("+str(Q3_EntityState.NetFields[i][1])+"))") # full floating point value (QUAKE3)
 
 		for i in range(lc,len(Q3_EntityState.NetFields)):
 			exec("to."+Q3_EntityState.NetFields[i][0]+" = fr."+Q3_EntityState.NetFields[i][0])
-		self.estates[self.c-1].append(to)
-		print('________________')
-		print(to.number)
-		print(to.pos.trBase)
-		print('________________')
 		return msg,fr,to
 
 	def readDeltaPlayerstate(self, msg, oldPs, newPs ):
@@ -354,21 +329,21 @@ class Q3_DemoParser:
 				bits = msg.ReadShort();
 				for i in range(16):
 					if(bits & (1<<i)):
-						newPs.Stats.append(msg.ReadShort())
+						newPs.Stats[i] = msg.ReadShort()
 
 			# parse persistant array
 			if(msg.ReadBits(1)):
 				bits = msg.ReadShort()
 				for i in range(16):
 					if(bits & (1<<i)):
-						newPs.Persistant.append(msg.ReadShort())
+						newPs.Persistant[i] = msg.ReadShort()
 
 			# parse ammo array
 			if(msg.ReadBits(1)):
 				bits = msg.ReadShort()
 				for i in range(16):
 					if(bits & (1<<i)):
-						newPs.Ammo.append(msg.ReadShort())
+						newPs.Ammo[i] = msg.ReadShort()
 
 			# parse powerups array
 			if(msg.ReadBits(1)):

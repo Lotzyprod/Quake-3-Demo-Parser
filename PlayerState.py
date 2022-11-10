@@ -86,8 +86,8 @@ class Q3_PlayerState:
 		self.eFlags = None			# copied to entityState_t->eFlags
 
 		self.EventSequence = None	# pmove generated events
-		self.Events = [0,0,0]
-		self.EventParms = [0,0,0]
+		self.Events = [None]*2
+		self.EventParms = [None]*2
 
 		self.ExternalEvent = None	# events set on player from another source
 		self.ExternalEventParm = None
@@ -106,10 +106,10 @@ class Q3_PlayerState:
 		self.DamagePitch = None
 		self.DamageCount = None
 
-		self.Stats = []
-		self.Persistant = []	# stats that aren't cleared on death
-		self.Powerups = []	# level.time that the powerup runs out
-		self.Ammo = []
+		self.Stats = [None]*16
+		self.Persistant = [None]*16	# stats that aren't cleared on death
+		self.Powerups = [None]*16	# level.time that the powerup runs out
+		self.Ammo = [None]*16
 
 		self.Generic1 = None
 		self.LoopSound = None

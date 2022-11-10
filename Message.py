@@ -1,9 +1,6 @@
 from Decompressor import Q3_Huffman_Decompressor
 
 class Q3_Message:
-	Q3_MAX_MSGLEN = 16384
-	Q3_BIG_INFO_STRING = 8192
-	MAX_STRING_CHARS = 1024
 	def __init__(self,len):
 		self.huffman = Q3_Huffman_Decompressor.create()
 		self.MaxSize = len
